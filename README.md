@@ -9,3 +9,4 @@ The script will install and setup:
 * kibina (port 5601 and 80)
 * logStash (port 5044)
 * filebeat (forward local /var/log/message and /var/log/secure to logStash)
+* mongodb

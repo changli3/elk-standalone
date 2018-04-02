@@ -12,7 +12,7 @@ enabled=1
 autorefresh=1
 type=rpm-md" | sudo tee /etc/yum.repos.d/elasticsearch.repo
 
-
+sudo yum -y install elasticsearch
 #install elasticsearch
 sudo systemctl enable elasticsearch.service
 
@@ -20,7 +20,6 @@ sudo systemctl enable elasticsearch.service
 echo "network.host: 0.0.0.0" | sudo tee -a /etc/elasticsearch/elasticsearch.yml
 
 #start elasticsearch
-sudo yum -y install elasticsearch
 sudo systemctl start elasticsearch.service
 
 #increase limits
@@ -29,8 +28,6 @@ elasticsearch soft nofile 65536
 elasticsearch hard nofile 65536
 elasticsearch soft memlock unlimited
 elasticsearch hard memlock unlimited" | sudo tee -a /etc/security/limits.conf
-
-
 
 #setup Kibana.repo
 echo "[kibana-6.x]
@@ -52,10 +49,6 @@ sudo service kibana restart
 #port forwording for Kibana, so you can access via port 80
 sudo iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 5601
 sudo iptables -t nat -I OUTPUT -p tcp -d 127.0.0.1 --dport 80 -j REDIRECT --to-ports 5601
-
-#remove the old format kibana index
-curl -XDELETE http://localhost:9200/.kibana
-
 
 #setup logStash.repo
 echo "[logstash-6.x]
@@ -148,3 +141,21 @@ sudo systemctl restart filebeat
 sudo systemctl enable filebeat
 
 
+#Install mongodb
+echo '[mongodb-org-3.6]
+name=MongoDB Repository
+baseurl=https://repo.mongodb.org/yum/redhat/$releasever/mongodb-org/3.6/x86_64/
+gpgcheck=1
+enabled=1
+gpgkey=https://www.mongodb.org/static/pgp/server-3.6.asc
+' | sudo tee /etc/yum.repos.d/mongodb-org.repo
+
+printf 'y' | sudo yum -y install mongodb-org
+echo '
+mongod soft nproc 32000
+' | sudo tee -a /etc/security/limits.d/20-nproc.conf
+
+sudo systemctl start mongod
+sudo systemctl enable mongod
+
+#
