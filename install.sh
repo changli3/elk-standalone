@@ -3,6 +3,26 @@ sudo setenforce 0
 sudo yum update -y
 sudo yum -y install java-1.8.0-openjdk jq wget unzip
 
+echo "[elasticsearch-6.x]
+name=elasticsearch repository for 6.x packages
+baseurl=https://artifacts.elastic.co/packages/6.x/yum
+gpgcheck=1
+gpgkey=https://artifacts.elastic.co/GPG-KEY-elasticsearch
+enabled=1
+autorefresh=1
+type=rpm-md" | sudo tee /etc/yum.repos.d/elasticsearch.repo
+
+
+#install elasticsearch
+sudo systemctl enable elasticsearch.service
+
+#update listening host
+echo "network.host: 0.0.0.0" | sudo tee -a /etc/elasticsearch/elasticsearch.yml
+
+#start elasticsearch
+sudo yum -y install elasticsearch
+sudo systemctl start elasticsearch.service
+
 #increase limits
 echo "
 elasticsearch soft nofile 65536
@@ -10,18 +30,6 @@ elasticsearch hard nofile 65536
 elasticsearch soft memlock unlimited
 elasticsearch hard memlock unlimited" | sudo tee -a /etc/security/limits.conf
 
-#download elasticsearch
-wget https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-6.2.3.rpm
-
-#install elasticsearch
-sudo rpm -i elasticsearch-6.2.3.rpm
-sudo systemctl enable elasticsearch.service
-
-#update listening host
-echo "network.host: 0.0.0.0" | sudo tee -a /etc/elasticsearch/elasticsearch.yml
-
-#start elasticsearch
-sudo systemctl start elasticsearch.service
 
 
 #setup Kibana.repo
@@ -111,10 +119,32 @@ gpgcheck=1' | sudo tee /etc/yum.repos.d/filebeat.repo
 sudo yum install -y filebeat
 
 ##
-echo 
-sudo vi /etc/filebeat/filebeat.yml
+echo 'filebeat:
+  prospectors:
+    -
+      paths:
+        - /var/log/secure
+        - /var/log/messages
+      
+      input_type: log
+      
+      document_type: syslog
 
-[root@client1 ~]# systemctl restart filebeat
-[root@client1 ~]# systemctl enable filebeat
+  registry_file: /var/lib/filebeat/registry
+
+output:
+  logstash:
+    hosts: ["localhost:5044"]
+    bulk_max_size: 1024
+
+shipper:
+
+logging:
+  files:
+    rotateeverybytes: 10485760 # = 10MB
+' | sudo tee /etc/filebeat/filebeat.yml
+
+sudo systemctl restart filebeat
+sudo systemctl enable filebeat
 
 
