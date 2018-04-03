@@ -11,4 +11,4 @@ The script will install and setup:
 * filebeat: example of using filebeat to forward local system log files /var/log/message and /var/log/secure to the logStash server
 * mongodb: running on 27017
 * logStash client: example of running mongo db stats on two data collections and forward the data to elasticSearch using logstash
-* packagebeat: example of using filebeat to forward mongodb traffic to elasticSearch
+* packagebeat: example of using packagebeat to forward mongodb traffic to elasticSearch
