@@ -158,4 +158,66 @@ mongod soft nproc 32000
 sudo systemctl start mongod
 sudo systemctl enable mongod
 
-#
+#create two test databases - for example monitoring
+SAMPLE_DB1=test_mongo_db_1
+SAMPLE_DB2=test_mongo_db_2
+mongo --eval "db.runCommand({create:'$SAMPLE_DB1'})"
+mongo --eval "db.runCommand({create:'$SAMPLE_DB2'})"
+
+#example of running stats on two data collections and forward the data using logstash
+echo "input {
+   exec {
+      command => \"mongo --eval 'db.serverStatus()' | tail -n +3 | sed 's/\(NumberLong([[:punct:]]\?\)\([[:digit:]]*\)\([[:punct:]]\?)\)/\2/' | sed 's/\(ISODate(\)\(.*\)\()\)/\2/'\"
+      interval => 7
+      type => \"db.serverStatus\"
+   }
+   exec {
+      command => \"mongo $SAMPLE_DB1 --eval 'db.stats()' | tail -n +3\"
+      interval => 7
+      type => \"db.$SAMPLE_DB1.stats\"
+   }
+   exec {
+      command => \"mongo $SAMPLE_DB2 --eval 'db.stats()' | tail -n +3\"
+      interval => 7
+      type => \"db.$SAMPLE_DB12.stats\"
+   }
+}
+filter {
+   json {
+      source => \"message\"
+   }
+}
+output {
+   elasticsearch {
+      hosts => [\"localhost:9200\"]
+   }
+}" > ~/logstash.config
+
+sudo /usr/share/logstash/bin/logstash -f logstash.config
+
+
+
+# install packetbeat to monitor mongodb
+sudo yum -y install libpcap
+curl -L -O https://artifacts.elastic.co/downloads/beats/packetbeat/packetbeat-6.2.3-x86_64.rpm
+sudo rpm -i packetbeat-6.2.3-x86_64.rpm
+
+echo '
+packetbeat.interfaces.device: any
+packetbeat.flows:
+  timeout: 30s
+  period: 10s
+packetbeat.protocols:
+- type: mongodb
+  ports: [27017]
+setup.template.settings:
+  index.number_of_shards: 3
+setup.kibana:
+  host: "localhost:5601"
+output.elasticsearch:
+  hosts: ["localhost:9200"]
+' | sudo tee /etc/packetbeat/packetbeat.yml
+
+sudo packetbeat setup --template -E output.logstash.enabled=false -E 'output.elasticsearch.hosts=["localhost:9200"]'
+sudo service packetbeat start
+sudo systemctl enable packetbeat
